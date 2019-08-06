@@ -1,15 +1,25 @@
 ---
 - name: "NOTSCORED | 6.1.1 | PATCH | Audit system file permissions"
-  command: /bin/true
-  changed_when: false
+  shell: dpkg --get-selections | grep -v deinstall | awk '{ print $1 }'
+  register: dpkg_output
   when:
-      - ubuntu1804cis_rule_6_1_1
+    - ubuntu1804cis_rule_6_1_1
   tags:
-      - level2
-      - notscored
-      - patch
-      - rule_6.1.1
-      - notimplemented
+    - level2
+    - notscored
+    - patch
+    - rule_6.1.1
+
+- name: "NOTSCORED | 6.1.1 | PATCH | Audit system file permissions"
+  shell: dpkg --verify {{ item }}
+  with_items: "{{ dpkg_output.stdout_lines }}"
+  when:
+    - ubuntu1804cis_rule_6_1_1
+  tags:
+    - level2
+    - notscored
+    - patch
+    - rule_6.1.1
 
 - name: "SCORED | 6.1.2 | PATCH | Ensure permissions on /etc/passwd are configured"
   file:
@@ -124,8 +134,21 @@
       - rule_6.1.9
 
 - name: "SCORED | 6.1.10 | PATCH | Ensure no world writable files exist"
-  command: /bin/true
+  shell: df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -type f -perm -0002 -print
+  register: world_writable_files
   changed_when: false
+  failed_when: false
+  when:
+    - ubuntu1804cis_rule_6_1_10
+  tags:
+    - level1
+    - scored
+    - patch
+    - rule_6.1.10
+
+- name: "SCORED | 6.1.10 | PATCH | Ensure no world writable files exist"
+  debug: "{{ item }}"
+  with_items: "{{ world_writable_files.stdout_lines }}"
   when:
       - ubuntu1804cis_rule_6_1_10
   tags:
@@ -133,47 +156,77 @@
       - scored
       - patch
       - rule_6.1.10
-      - notimplemented
 
 - name: "SCORED | 6.1.11 | PATCH | Ensure no unowned files or directories exist"
-  command: /bin/true
-  changed_when: false
+  shell: df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nouser -ls
+  register: unowned_files
   when:
-      - ubuntu1804cis_rule_6_1_11
+    - ubuntu1804cis_rule_6_1_11
   tags:
-      - level1
-      - scored
-      - patch
-      - rule_6.1.11
-      - notimplemented
+    - level1
+    - scored
+    - patch
+    - rule_6.1.11
+
+- name: "SCORED | 6.1.11 | PATCH | Ensure no unowned files or directories exist"
+  debug: "{{ item }}"
+  with_items: "{{ unowned_files.stdout_lines }}"
+  when:
+    - ubuntu1804cis_rule_6_1_11
+  tags:
+    - level1
+    - scored
+    - patch
+    - rule_6.1.11
 
 - name: "SCORED | 6.1.12 | PATCH | Ensure no ungrouped files or directories exist"
-  command: /bin/true
-  changed_when: false
+  shell: df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nogroup -ls
+  register: ungrouped_files
   when:
-      - ubuntu1804cis_rule_6_1_12
+    - ubuntu1804cis_rule_6_1_12
   tags:
-      - level1
-      - scored
-      - patch
-      - rule_6.1.12
-      - notimplemented
+    - level1
+    - scored
+    - patch
+    - rule_6.1.12
+
+- name: "SCORED | 6.1.12 | PATCH | Ensure no ungrouped files or directories exist"
+  debug: "{{ item }}"
+  with_items: "{{ ungrouped_files.stdout_lines}}"
+  when:
+    - ubuntu1804cis_rule_6_1_12
+  tags:
+    - level1
+    - scored
+    - patch
+    - rule_6.1.12
 
 - name: "NOTSCORED | 6.1.13 | PATCH | Audit SUID executables"
-  command: /bin/true
-  changed_when: false
+  shell: df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -type f -perm -4000
+  register: suid_files
   when:
-      - ubuntu1804cis_rule_6_1_13
+    - ubuntu1804cis_rule_6_1_13
   tags:
-      - level1
-      - notscored
-      - patch
-      - rule_6.1.13
-      - notimplemented
+    - level1
+    - notscored
+    - patch
+    - rule_6.1.13
+
+- name: "NOTSCORED | 6.1.13 | PATCH | Audit SUID executables"
+  debug:
+    msg: "Audit SUID {{ item }}"
+  with_items: "{{ suid_files.stdout_lines }}"
+  when:
+    - ubuntu1804cis_rule_6_1_13
+  tags:
+    - level1
+    - notscored
+    - patch
+    - rule_6.1.13
 
 - name: "NOTSCORED | 6.1.14 | PATCH | Audit SGID executables"
-  command: /bin/true
-  changed_when: false
+  shell: df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -type f -perm -2000
+  register: gsuid_files
   when:
       - ubuntu1804cis_rule_6_1_14
   tags:
@@ -181,7 +234,18 @@
       - notscored
       - patch
       - rule_6.1.14
-      - notimplemented
+
+- name: "NOTSCORED | 6.1.14 | PATCH | Audit SGID executables"
+  debug:
+    msg: "Audit SGID {{ item }}"
+  with_items: "{{gsuid_files.stdout_lines}}"
+  when:
+    - ubuntu1804cis_rule_6_1_14
+  tags:
+    - level1
+    - notscored
+    - patch
+    - rule_6.1.14
 
 - name: "SCORED | 6.2.1 | PATCH | Ensure password fields are not empty"
   command: passwd -l {{ item }}
@@ -251,18 +315,6 @@
       - rule_6.2.5
 
 - name: "SCORED | 6.2.6 | PATCH | Ensure root PATH Integrity"
-  command: /bin/true
-  changed_when: false
-  when:
-      - ubuntu1804cis_rule_6_2_6
-  tags:
-      - level1
-      - scored
-      - patch
-      - rule_6.2.6
-      - notimplemented
-
-- name: "SCORED | 6.2.6 | PATCH | Ensure root PATH Integrity"
   shell: |
     set -o pipefail
     sudopath=($(grep secure_path /etc/sudoers | cut -f2 -d= |cut -f2 -d\"))
@@ -275,12 +327,12 @@
      done
     echo "${newsudopath[*]}"
   args:
-      executable: /bin/bash
+    executable: /bin/bash
   register: fixsudo
   changed_when: false
   check_mode: false
   when:
-      - ubuntu1804cis_rule_6_2_6
+    - ubuntu1804cis_rule_6_2_6
   tags:
       - level1
       - scored
@@ -289,10 +341,10 @@
 
 - name: "SCORED | 6.2.6 | PATCH | Ensure root PATH Integrity"
   lineinfile:
-      dest: /etc/sudoers
-      regexp: "(.*secure_path=).*"
-      line: '\1"{{ fixsudo.stdout_lines[0] }}"'
-      backrefs: true
+    dest: /etc/sudoers
+    regexp: "(.*secure_path=).*"
+    line: '\1"{{ fixsudo.stdout_lines[0] }}"'
+    backrefs: true
   when:
       - fixsudo.stdout_lines[0]
   tags:

@@ -425,8 +425,27 @@
       - rule_4.2.1.1
 
 - name: "NOTSCORED | 4.2.1.2 | PATCH | Ensure logging is configured"
-  command: /bin/true
-  changed_when: false
+  lineinfile:
+    path: /etc/rsyslog.conf
+    line: '{{ item }}'
+    insertafter: EOF
+  with_items:
+    - '*.emerg :omusrmsg:*'
+    - 'mail.* -/var/log/mail'
+    - 'mail.info -/var/log/mail.info'
+    - 'mail.warning -/var/log/mail.warn'
+    - 'mail.err /var/log/mail.err'
+    - 'news.crit -/var/log/news/news.crit'
+    - 'news.err -/var/log/news/news.err'
+    - 'news.notice -/var/log/news/news.notice'
+    - '*.=warning;*.=err -/var/log/warn'
+    - '*.crit /var/log/warn'
+    - '*.*;mail.none;news.none -/var/log/messages'
+    - 'local0,local1.* -/var/log/localmessages'
+    - 'local2,local3.* -/var/log/localmessages'
+    - 'local4,local5.* -/var/log/localmessages'
+    - 'local6,local7.* -/var/log/localmessages'
+  notify: restart rsyslog
   when:
       - ubuntu1804cis_rule_4_2_1_2
   tags:
@@ -435,13 +454,13 @@
       - patch
       - syslog
       - rule_4.2.1.2
-      - notimplemented
 
 - name: "SCORED | 4.2.1.3 | PATCH | Ensure rsyslog default file permissions configured"
   lineinfile:
       dest: /etc/rsyslog.conf
       regexp: '^\$FileCreateMode'
       line: '$FileCreateMode 0640'
+  notify: restart rsyslog
   when:
       - ubuntu1804cis_rule_4_2_1_3
   tags:
@@ -452,8 +471,10 @@
       - rule_4.2.1.3
 
 - name: "SCORED | 4.2.1.4 | PATCH | Ensure rsyslog is configured to send logs to a remote log host"
-  command: /bin/true
+  command: grep "^*.*[^I][^I]*@" /etc/rsyslog.conf
+  register: remoteloghost
   changed_when: false
+  failed_when: false
   when:
       - ubuntu1804cis_rule_4_2_1_4
   tags:
@@ -462,98 +483,156 @@
       - patch
       - syslog
       - rule_4.2.1.4
-      - notimplemented
 
-- name: "NOTSCORED | 4.2.1.5 | PATCH | Ensure remote rsyslog messages are only accepted on designated log hosts."
-  command: /bin/true
-  changed_when: false
+- name: "SCORED | 4.2.1.4 | PATCH | Ensure rsyslog is configured to send logs to a remote log host"
+  lineinfile:
+    path: /etc/rsyslog.conf
+    line: '*.* @@{{ ubuntu1804cis_remoteloghost }}'
+    insertafter: EOF
+    state: present
+  notify: restart rsyslog
   when:
-      - ubuntu1804cis_rule_4_2_1_5
+    - ubuntu1804cis_rule_4_2_1_4
+    - ubuntu1804cis_remoteloghost is defined
   tags:
       - level1
-      - notscored
+      - scored
       - patch
       - syslog
-      - rule_4.2.1.5
-      - notimplemented
+      - rule_4.2.1.4
 
 - name: "NOTSCORED | 4.2.1.5 | PATCH | Ensure remote rsyslog messages are only accepted on designated log hosts."
-  command: /bin/true
+  command: grep '^$ModLoad imtcp' /etc/rsyslog.conf
+  register: moadloadpresent
   changed_when: false
+  failed_when: false
   when:
-      - ubuntu1804cis_rule_4_2_1_5
+    - ubuntu1804cis_rule_4_2_1_5
   tags:
-      - level1
-      - notscored
-      - patch
-      - syslog
-      - rule_4.2.1.5
-      - notimplemented
+    - level1
+    - notscored
+    - patch
+    - syslog
+    - rule_4.2.1.5
+
+- name: "NOTSCORED | 4.2.1.5 | PATCH | Ensure remote rsyslog messages are only accepted on designated log hosts."
+  lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^#({{ item }})'
+    line: '{{ item }}'
+    state: absent
+  with_items:
+    - '$ModLoad imtcp'
+    - '$InputTCPServerRun 514'
+  notify: restart rsyslog
+  when:
+    - moadloadpresent.rc == 1
+    - ubuntu1804cis_syslog == "rsyslog" 
+    - ubuntu1804cis_syslog_host == "disabled"
+    - ubuntu1804cis_rule_4_2_1_5
+  tags:
+    - level1
+    - notscored
+    - patch
+    - syslog
+    - rule_4.2.1.5
 
 - name: "SCORED | 4.2.2.1 | PATCH | Ensure syslog-ng service is enabled"
-  command: /bin/true
-  changed_when: false
+  service:
+    name: syslog-ng
+    enabled: yes
   when:
-      - ubuntu1804cis_rule_4_2_2_1
+    - ubuntu1804cis_rule_4_2_2_1
+    - ubuntu1804cis_syslog == "syslog-ng" 
   tags:
       - level1
       - scored
       - patch
       - syslog
       - rule_4.2.2.1
-      - notimplemented
 
 - name: "NOTSCORED | 4.2.2.2 | PATCH | Ensure logging is configured"
-  command: /bin/true
-  changed_when: false
+  lineinfile:
+    path: /etc/syslog-ng/syslog-ng.conf
+    line: '{{ item }}'
+    insertafter: EOF
+  with_items:
+    - 'log { source(src); source(chroots); filter(f_console); destination(console); };'
+    - 'log { source(src); source(chroots); filter(f_console); destination(xconsole); };'
+    - 'log { source(src); source(chroots); filter(f_newscrit); destination(newscrit); };'
+    - 'log { source(src); source(chroots); filter(f_newserr); destination(newserr); };'
+    - 'log { source(src); source(chroots); filter(f_newsnotice); destination(newsnotice); };'
+    - 'log { source(src); source(chroots); filter(f_mailinfo); destination(mailinfo); };'
+    - 'log { source(src); source(chroots); filter(f_mailwarn); destination(mailwarn); };'
+    - 'log { source(src); source(chroots); filter(f_mailerr); destination(mailerr); };'
+    - 'log { source(src); source(chroots); filter(f_mail); destination(mail); };'
+    - 'log { source(src); source(chroots); filter(f_acpid); destination(acpid); flags(final); };'
+    - 'log { source(src); source(chroots); filter(f_acpid_full); destination(devnull); flags(final); };'
+    - 'log { source(src); source(chroots); filter(f_acpid_old); destination(acpid); flags(final); };'
+    - 'log { source(src); source(chroots); filter(f_netmgm); destination(netmgm); flags(final); };'
+    - 'log { source(src); source(chroots); filter(f_local); destination(localmessages); };'
+    - 'log { source(src); source(chroots); filter(f_messages); destination(messages); };'
+    - 'log { source(src); source(chroots); filter(f_iptables); destination(firewall); };'
+    - 'log { source(src); source(chroots); filter(f_warn); destination(warn); };'
+  notify: restart syslog-ng
   when:
-      - ubuntu1804cis_rule_4_2_2_2
+    - ubuntu1804cis_rule_4_2_2_2
+    - ubuntu1804cis_syslog == "syslog-ng" 
   tags:
       - level1
       - notscored
       - patch
       - syslog
       - rule_4.2.2.2
-      - notimplemented
 
 - name: "SCORED | 4.2.2.3 | PATCH | Ensure syslog-ng default file permissions configured"
-  command: /bin/true
-  changed_when: false
+  lineinfile:
+    path: /etc/syslog-ng/syslog-ng.conf
+    regexp: '^options'
+    line: 'options { chain_hostnames(off); flush_lines(0); perm(0640); stats_freq(3600); threaded(yes); };'
   when:
-      - ubuntu1804cis_rule_4_2_2_3
+    - ubuntu1804cis_rule_4_2_2_3
+    - ubuntu1804cis_syslog == "syslog-ng" 
   tags:
       - level1
       - scored
       - patch
       - syslog
       - rule_4.2.2.3
-      - notimplemented
 
 - name: "NOTSCORED | 4.2.2.4 | PATCH | Ensure syslog-ng is configured to send logs to a remote log host"
-  command: /bin/true
-  changed_when: false
+  lineinfile:
+    path: /etc/syslog-ng/syslog-ng.conf
+    regexp: '^destination'
+    line: 'destination logserver { tcp(" {{ ubuntu1804cis_syslog_remotehost }} " port(514)); }; log { source(src); destination(logserver); };'
   when:
-      - ubuntu1804cis_rule_4_2_2_4
+    - ubuntu1804cis_rule_4_2_2_4
+    - ubuntu1804cis_syslog_remotehost is defined
   tags:
-      - level1
-      - notscored
-      - patch
-      - syslog
-      - rule_4.2.2.4
-      - notimplemented
+    - level1
+    - notscored
+    - patch
+    - syslog
+    - rule_4.2.2.4
 
 - name: "NOTSCORED | 4.2.2.5 | PATCH | Ensure remote syslog-ng messages are only accepted on designated log hosts"
-  command: /bin/true
-  changed_when: false
+  lineinfile:
+    path: /etc/syslog-ng/syslog-ng.conf
+    line: '{{ item }}"'
+    insertafter: EOF
+  with_items:
+    - 'source net{ tcp(); };'
+    - 'destination remote { file("/var/log/remote/${FULLHOST}-log"); };'
+    - 'log { source(net); destination(remote); };'
   when:
-      - ubuntu1804cis_rule_4_2_2_5
+    - ubuntu1804cis_rule_4_2_2_5
+    - ubuntu1804cis_syslog == "syslog-ng"
   tags:
       - level1
       - notscored
       - patch
       - syslog
       - rule_4.2.2.5
-      - notimplemented
 
 - name: "SCORED | 4.2.4 | PATCH | Ensure permissions on all logfiles are configured"
   command: find /var/log -type f -exec chmod g-wx,o-rwx {} +
@@ -570,27 +649,27 @@
 
 - name: "NOTSCORED | 4.3 | PATCH | Ensure logrotate is configured"
   block:
-      - name: "NOTSCORED | 4.3 | PATCH | Register logrotate.d files"
-        find:
-            paths: /etc/logrotate.d/
-        register: log_rotates
+    - name: "NOTSCORED | 4.3 | PATCH | Register logrotate.d files"
+      find:
+        paths: /etc/logrotate.d/
+      register: log_rotates
 
-      - name: "NOTSCORED | 4.3 | PATCH | Ensure logrotate.conf exists"
-        file:
-            path: /etc/logrotate.conf
-            state: touch
-        changed_when: false
+    - name: "NOTSCORED | 4.3 | PATCH | Ensure logrotate.conf exists"
+      file:
+        path: /etc/logrotate.conf
+        state: touch
+      changed_when: false
 
-      - name: "NOTSCORED | 4.3 | PATCH | Ensure logrotate is configured"
-        replace:
-            path: "{{ item.path }}"
-            regexp: '^(\s*)(daily|weekly|monthly|yearly)$'
-            replace: "\\1{{ ubuntu1804cis_logrotate }}"
-        with_items:
-            - "{{ log_rotates.files }}"
-            - { path: "/etc/logrotate.conf" }
+    - name: "NOTSCORED | 4.3 | PATCH | Ensure logrotate is configured"
+      replace:
+        path: "{{ item.path }}"
+        regexp: '^(\s*)(daily|weekly|monthly|yearly)$'
+        replace: "\\1{{ ubuntu1804cis_logrotate }}"
+      with_items:
+        - "{{ log_rotates.files }}"
+        - { path: "/etc/logrotate.conf" }
   when:
-      - ubuntu1804cis_rule_4_3
+    - ubuntu1804cis_rule_4_3
   tags:
       - level1
       - notscored

@@ -292,7 +292,7 @@ ubuntu1804cis_set_boot_pass: false
 ubuntu1804cis_is_router: false
 
 # IPv6 required
-ubuntu1804cis_ipv6_required: true
+ubuntu1804cis_ipv6_required: false
 
 # AIDE
 ubuntu1804cis_config_aide: true
@@ -348,11 +348,11 @@ ubuntu1804cis_firewall: firewalld
 
 ubuntu1804cis_firewall_services:
   - ssh
-  - dhcpv6-client
+  # - dhcpv6-client
 
 # Warning Banner Content (issue, issue.net, motd)
 ubuntu1804cis_warning_banner: |
-    Authorized uses only. All activity may be monitored and reported.
+    All activities performed on this device are logged and monitored. Authorized users only.
 # End Banner
 
 ## Section 4 Vars
@@ -361,6 +361,7 @@ ubuntu1804cis_auditd:
   max_log_file_action: keep_logs
 
 ubuntu1804cis_logrotate: "daily"
+# ubuntu1804cis_remoteloghost: ""
 
 ## Section 5 Vars
 ubuntu1804cis_sshd:
@@ -392,8 +393,11 @@ ubuntu1804cis_pass:
   min_days: 7
   warn_age: 7
 
+ubuntu1804cis_password_remember: 5 
 # Syslog system
 ubuntu1804cis_syslog: rsyslog
+ubuntu1804cis_syslog_host: "disabled"
+# ubuntu1804cis_syslog_remotehost: 127.0.0.1
 # ubuntu1804cis_syslog: syslog-ng
 
 ubuntu1804cis_vartmp:
@@ -438,4 +442,4 @@ chrony_config_file:
   Debian: /etc/chrony/chrony.conf
 
 ### Firewall
-ubuntu1804cis_setup_firewall: false
+ubuntu1804cis_setup_firewall: true
